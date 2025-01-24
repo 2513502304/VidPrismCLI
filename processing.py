@@ -207,11 +207,13 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
     playsound(input_audio_path, block=False)
     # 依次打印每个文本文件内容
     for symbol in symbols:
-        os.system('cls')
         start = time.time()
+        os.system('cls')
         print(symbol, flush=True)
         end = time.time()
         ptime = end - start
         if interval > ptime:
             # 减慢打印速度
             time.sleep(interval - ptime)
+    # reset all settings
+    print(Fore.RESET, Back.RESET, Style.RESET_ALL)
