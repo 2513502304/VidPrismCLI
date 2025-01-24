@@ -207,9 +207,9 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
     playsound(input_audio_path, block=False)
     # 依次打印每个文本文件内容
     for symbol in symbols:
+        os.system('cls')
         start = time.time()
         print(symbol, flush=True)
-        os.system('cls')
         end = time.time()
         ptime = end - start
         if interval > ptime:
