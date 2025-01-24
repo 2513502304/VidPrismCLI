@@ -11,6 +11,28 @@ import string
 import random
 from utils import logger
 
+# 颜色吸管：https://photokit.com/colors/eyedropper/?lang=zh
+BLACK: Final = (12, 12, 12)  # #0c0c0c
+RED: Final = (197, 15, 31)  # #c50f1f
+GREEN: Final = (19, 161, 14)  # #13a10e
+YELLOW: Final = (193, 156, 0)  # #c19c00
+BLUE: Final = (0, 55, 218)  # #0037da
+MAGENTA: Final = (136, 23, 152)  # #881798
+CYAN: Final = (58, 150, 221)  # #3a96dd
+WHILE: Final = (193, 193, 193)  # #c1c1c1
+
+# 颜色选择器
+switcher: Final = {
+    BLACK: Fore.BLACK,
+    RED: Fore.RED,
+    GREEN: Fore.GREEN,
+    YELLOW: Fore.YELLOW,
+    BLUE: Fore.BLUE,
+    MAGENTA: Fore.MAGENTA,
+    CYAN: Fore.CYAN,
+    WHILE: Fore.WHITE,
+}
+
 
 def split_va(input_file_path: str, output_video_path: str, output_audio_path: str) -> None:
     '''
@@ -68,29 +90,6 @@ def merge_va(input_video_path: str, input_audio_path: str, output_file_path: str
         logger.info(f'{stderr}')
 
 
-# 颜色吸管：https://photokit.com/colors/eyedropper/?lang=zh
-BLACK: Final = (12, 12, 12)  # #0c0c0c
-RED: Final = (197, 15, 31)  # #c50f1f
-GREEN: Final = (19, 161, 14)  # #13a10e
-YELLOW: Final = (193, 156, 0)  # #c19c00
-BLUE: Final = (0, 55, 218)  # #0037da
-MAGENTA: Final = (136, 23, 152)  # #881798
-CYAN: Final = (58, 150, 221)  # #3a96dd
-WHILE: Final = (193, 193, 193)  # #c1c1c1
-
-# 颜色选择器
-switcher: Final = {
-    BLACK: Fore.BLACK,
-    RED: Fore.RED,
-    GREEN: Fore.GREEN,
-    YELLOW: Fore.YELLOW,
-    BLUE: Fore.BLUE,
-    MAGENTA: Fore.MAGENTA,
-    CYAN: Fore.CYAN,
-    WHILE: Fore.WHITE,
-}
-
-
 def get_color_code(rgb: Sequence[int]) -> str:
     '''
     获取颜色映射代码
@@ -145,6 +144,8 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int = 64) -> b
                 break
             except AssertionError as e:
                 logger.warning('输入错误，请重新输入')
+    # 字符集
+    charset = string.digits + string.ascii_letters + string.punctuation
     # 当前视频帧
     current_frame = 1
     logger.info('正在对视频帧进行文本转换，请稍后')
@@ -155,15 +156,15 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int = 64) -> b
         if not ret:
             logger.warning('相机已断开连接或视频文件中没有更多帧')
             break
-        # 由于将图像像素替换为符号来表示会导致图像过大，此处重置图像大小
-        h, w = image.shape[:2]
-        while h > aspect or w > aspect:
-            h //= 2
-            w //= 2
+        # 从第一帧中获取缩放高宽
+        if current_frame == 1:
+            # 由于将图像像素替换为符号来表示会导致图像过大，此处重置图像大小
+            h, w = image.shape[:2]
+            while h > aspect or w > aspect:
+                h //= 2
+                w //= 2
         image = cv.resize(image, (w, h), interpolation=cv.INTER_CUBIC)
         rgb_image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-        # 字符集
-        charset = string.digits + string.ascii_letters + string.punctuation
         # 将二值化图像替换为符号
         with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
             for height in range(h):
