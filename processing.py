@@ -1,6 +1,7 @@
 from colorama import just_fix_windows_console, Fore, Back, Style, Cursor
 from playsound import playsound
 from typing import Sequence, MutableSequence, Final
+from rich.progress import track
 import subprocess
 import numpy as np
 import os
@@ -9,7 +10,7 @@ import cv2 as cv
 import time
 import string
 import random
-from utils import logger
+from utils import logger, console
 
 # 颜色吸管：https://photokit.com/colors/eyedropper/?lang=zh
 BLACK: Final = (12, 12, 12)  # #0c0c0c
@@ -97,24 +98,32 @@ def get_color_code(rgb: Sequence[int]) -> str:
     :param rgb: rgb 列表
     :return: 颜色映射代码
     '''
-    rgb = np.array(rgb)
-    # 颜色列表
-    colors = np.array(list(switcher.keys()))
+    # 输入的 rgb 颜色
+    rgb = np.asarray(rgb, dtype=np.uint8).reshape(1, 1, 3)
+    # 将 rgb 颜色转换为 lab 颜色
+    lab = cv.cvtColor(rgb, cv.COLOR_RGB2LAB).reshape(3)
+    # rgb 颜色列表
+    colors = np.asarray(list(switcher.keys()), np.uint8).reshape(-1, 1, 3)
+    # 将 rgb 颜色列表转换为 lab 颜色列表
+    lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB).reshape(-1, 3)
+    # 计算所有颜色之间的欧氏距离
+    distances = np.linalg.norm(lab_colors - lab, axis=1)
+    # 找到最小距离的索引
+    min_index = np.argmin(distances)
     # 最佳匹配颜色
-    best_color = np.array([np.inf, np.inf, np.inf])
-    for c in colors:
-        if np.sum(np.abs(c - rgb)) < np.sum(np.abs(best_color - rgb)):
-            best_color = c
+    best_color = colors[min_index].reshape(3)
     # 返回颜色映射代码
     return switcher.get(tuple(best_color), Fore.BLACK)
 
 
-def video2txt(input_video_path: str, output_txt_dir: str, aspect: int = 64) -> bool:
+def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool) -> bool:
     '''
     视频转文本
     ---
     :param input_video_path: 携带视频信息的输入文件路径
     :param output_txt_dir: 输出视频帧文本的文件夹路径
+    :param aspect: 预处理为文本前，将图像宽高放缩至不小于该参数
+    :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边
     :return: 若转换成功，返回 True，否则返回 False
     '''
     # 打开视频
@@ -150,30 +159,43 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int = 64) -> b
     current_frame = 1
     logger.info('正在对视频帧进行文本转换，请稍后')
     start = time.time()
-    while True:
-        # 获取视频的每一帧图像
-        ret, image = capture.read()
-        if not ret:
-            logger.warning('相机已断开连接或视频文件中没有更多帧')
-            break
-        # 从第一帧中获取缩放高宽
-        if current_frame == 1:
-            # 由于将图像像素替换为符号来表示会导致图像过大，此处重置图像大小
-            h, w = image.shape[:2]
-            while h > aspect or w > aspect:
-                h //= 2
-                w //= 2
-        image = cv.resize(image, (w, h), interpolation=cv.INTER_CUBIC)
-        rgb_image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-        # 将二值化图像替换为符号
-        with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
-            for height in range(h):
-                line = ''
-                for width in range(w):
-                    # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
-                    line += get_color_code(rgb_image[height][width]) + ''.join(random.choices(charset, k=2))
-                f.write(line + '\n')
-        current_frame += 1
+    with console.status('文本转换中...', spinner='earth') as status:
+        while True:
+            s = time.time()
+            # 获取视频的每一帧图像
+            ret, image = capture.read()
+            if not ret:
+                logger.warning('相机已断开连接或视频文件中没有更多帧')
+                break
+            # 从第一帧中获取缩放高宽
+            if current_frame == 1:
+                # 由于将图像像素替换为符号来表示会导致图像过大，此处重置图像大小
+                h, w = image.shape[:2]
+                while h > aspect or w > aspect:
+                    h //= 2
+                    w //= 2
+            image = cv.resize(image, (w, h), interpolation=cv.INTER_CUBIC)
+            # 增强图像细节
+            if enhance_detail:
+                # 灰度图
+                gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+                # 提取边缘
+                edges = cv.Canny(gray, threshold1=100, threshold2=200, L2gradient=True)
+                # 添加白色描边
+                image[edges == 255] = 255
+            # 转换为 rgb
+            rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+            # 将二值化图像替换为符号
+            with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
+                for height in range(h):
+                    line = ''
+                    for width in range(w):
+                        # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
+                        line += get_color_code(rgb[height][width]) + ''.join(random.choices(charset, k=2))
+                    f.write(line + '\n')
+            e = time.time()
+            logger.info(f'第 {current_frame} 帧文本转换完成，处理时间：{e - s}s')
+            current_frame += 1
     capture.release()
     end = time.time()
     logger.info(f'文本转换完成，处理时间：{end - start}s')
@@ -198,22 +220,31 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
     # 依次读取每一个文本文件内容到列表中
     logger.info('正在读取文件中，请稍后')
     start = time.time()
-    for file in files:
+    for file in track(files, description='读取文件中...'):
         with open(os.path.join(input_txt_dir, file), 'r', encoding='utf-8') as f:
             symbols.append(f.read())
     end = time.time()
-    logger.info(f'读取文件完成，处理时间：{end - start}')
+    logger.info(f'读取文件完成，处理时间：{end - start}s')
     # 播放音乐
     playsound(input_audio_path, block=False)
     # 依次打印每个文本文件内容
-    for symbol in symbols:
-        start = time.time()
-        os.system('cls')
-        print(symbol, flush=True)
-        end = time.time()
-        ptime = end - start
-        if interval > ptime:
-            # 减慢打印速度
-            time.sleep(interval - ptime)
+    start_time = time.time()
+    for i, symbol in enumerate(symbols):
+        # 当前时间
+        current_time = time.time()
+        # 实际经过时间
+        elapsed_time = current_time - start_time
+        # 每帧预期时间
+        expected_time = i * interval
+        # 时间差
+        delta_time = elapsed_time - expected_time
+        # 若生成文本文件内容过小，则 print 操作相对快速
+        if delta_time < 0:  # 减慢打印速度
+            os.system('cls')
+            print(symbol, flush=True)
+            time.sleep(interval - delta_time)
+        # 若生成文本文件内容过大，则 print 操作相对耗时
+        else:  # 跳过当前帧，以实现抽帧效果，与音频同步
+            continue
     # reset all settings
     print(Fore.RESET, Back.RESET, Style.RESET_ALL)
