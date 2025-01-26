@@ -1,4 +1,5 @@
 from colorama import just_fix_windows_console, Fore, Back, Style, Cursor
+from skimage.color import deltaE_ciede2000
 from playsound import playsound
 from typing import Sequence, MutableSequence, Final
 from rich.progress import track
@@ -91,29 +92,57 @@ def merge_va(input_video_path: str, input_audio_path: str, output_file_path: str
         logger.info(f'{stderr}')
 
 
-def get_color_code(rgb: Sequence[int]) -> str:
+def get_color_codes(rgb: Sequence[Sequence[int]]) -> list[str]:
     '''
-    获取颜色映射代码
+    获取颜色映射代码列表
     ---
-    :param rgb: rgb 列表
-    :return: 颜色映射代码
+    :param rgb: rgb list-like or ndarray, shape=(N, 3)
+    :return: 颜色映射代码列表
     '''
-    # 输入的 rgb 颜色
-    rgb = np.asarray(rgb, dtype=np.uint8).reshape(1, 1, 3)
-    # 将 rgb 颜色转换为 lab 颜色
-    lab = cv.cvtColor(rgb, cv.COLOR_RGB2LAB).reshape(3)
-    # rgb 颜色列表
+    #! 使用矢量化操作提高性能，并配合 numpy 默认行存储的特性对其内存布局进行计算优化，以保证所有的计算都发生在行操作 (axis=1) 而非列操作 (axis=0) 上
+    # 输入的 rgb 颜色，shape=(N, 1, 3)
+    rgb = np.asarray(rgb, dtype=np.uint8).reshape(-1, 1, 3)
+    # rgb 颜色列表，shape=(M, 1, 3)
     colors = np.asarray(list(switcher.keys()), np.uint8).reshape(-1, 1, 3)
-    # 将 rgb 颜色列表转换为 lab 颜色列表
-    lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB).reshape(-1, 3)
-    # 计算所有颜色之间的欧氏距离
-    distances = np.linalg.norm(lab_colors - lab, axis=1)
-    # 找到最小距离的索引
-    min_index = np.argmin(distances)
-    # 最佳匹配颜色
-    best_color = colors[min_index].reshape(3)
-    # 返回颜色映射代码
-    return switcher.get(tuple(best_color), Fore.BLACK)
+    # 判断 rgb 颜色与 colors 颜色列表大小，以适用不同策略，进行计算优化
+    N, M = rgb.shape[0], colors.shape[0]
+    #! 大多数情况下，N >> M
+    if M < N:
+        # 将 rgb 颜色转换为 lab 颜色，shape=(N, 3)
+        lab = cv.cvtColor(rgb, cv.COLOR_RGB2LAB).reshape(-1, 3)
+        # 将 rgb 颜色列表转换为 lab 颜色列表，shape=(M, 1, 3)
+        lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB)
+        # N 个颜色分别和 M 个颜色之间的距离，shape=(M, N)
+        distances = []
+        # 遍历 M 次，依次找到 N 个颜色和 M 个颜色之间的距离，每轮循环获得 M 个颜色中的一个与 N 个颜色的距离
+        for i in range(M):
+            # 使用 CIEDE 2000 标准给出的色差，计算所有颜色之间的距离，shape=(N, )
+            distance = deltaE_ciede2000(lab, lab_colors[i], channel_axis=-1)
+            # 添加 M 个颜色中的一个与 N 个颜色的距离
+            distances.append(distance)
+        # 找到最小距离的索引
+        min_index = np.argmin(np.asarray(distances).T, axis=1)
+        # 最佳匹配颜色，shape=(N, 3)
+        best_color = colors[min_index].reshape(-1, 3)
+        # 返回颜色映射代码
+        return [switcher.get(tuple(bc), Fore.BLACK) for bc in best_color]
+    else:
+        # 将 rgb 颜色转换为 lab 颜色，shape=(N, 1, 3)
+        lab = cv.cvtColor(rgb, cv.COLOR_RGB2LAB)
+        # 将 rgb 颜色列表转换为 lab 颜色列表，shape=(M, 3)
+        lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB).reshape(-1, 3)
+        # N 个颜色在 M 个颜色之中，与其最近的颜色，shape=(N, )
+        best_color = []
+        # 遍历 N 次，依次找到 N 个颜色在 M 个颜色之中，与其最近的颜色，每轮循环确定 N 个颜色中的一个在 M 个颜色最近的颜色
+        for i in range(N):
+            # 使用 CIEDE 2000 标准给出的色差，计算所有颜色之间的距离，shape=(M, )
+            distances = deltaE_ciede2000(lab_colors, lab[i], channel_axis=-1)
+            # 找到最小距离的索引
+            min_index = np.argmin(distances)
+            # 最佳匹配颜色，shape=(3, )
+            best_color.append(colors[min_index].reshape(3))
+        # 返回颜色映射代码
+        return [switcher.get(tuple(bc), Fore.BLACK) for bc in best_color]
 
 
 def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool) -> bool:
@@ -185,14 +214,15 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
                 image[edges == 255] = 255
             # 转换为 rgb
             rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+            # 获取颜色映射代码列表
+            rgb_color_codes = get_color_codes(rgb.reshape(-1, 3))
             # 将二值化图像替换为符号
             with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
-                for height in range(h):
-                    line = ''
-                    for width in range(w):
-                        # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
-                        line += get_color_code(rgb[height][width]) + ''.join(random.choices(charset, k=2))
-                    f.write(line + '\n')
+                # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
+                symbols = [
+                    c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2)) for i, c in enumerate(rgb_color_codes)
+                ]
+                f.write(''.join(symbols))
             e = time.time()
             logger.info(f'第 {current_frame} 帧文本转换完成，处理时间：{e - s}s')
             current_frame += 1
