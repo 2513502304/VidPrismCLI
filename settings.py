@@ -20,3 +20,6 @@ aspect = 256
 
 # 是否增强图像细节，为图像边缘添加白色描边
 enhance_detail = True
+
+# 是否增强颜色细节，由 8 色添加到 24 色
+enhance_color = True
