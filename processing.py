@@ -14,25 +14,63 @@ import random
 from utils import logger, console
 
 # 颜色吸管：https://photokit.com/colors/eyedropper/?lang=zh
-BLACK: Final = (12, 12, 12)  # #0c0c0c
-RED: Final = (197, 15, 31)  # #c50f1f
-GREEN: Final = (19, 161, 14)  # #13a10e
-YELLOW: Final = (193, 156, 0)  # #c19c00
-BLUE: Final = (0, 55, 218)  # #0037da
-MAGENTA: Final = (136, 23, 152)  # #881798
-CYAN: Final = (58, 150, 221)  # #3a96dd
-WHILE: Final = (193, 193, 193)  # #c1c1c1
+# normal color
+NORMAL_BLACK: Final = (12, 12, 12)  # #0c0c0c
+NORMAL_RED: Final = (197, 15, 31)  # #c50f1f
+NORMAL_GREEN: Final = (19, 161, 14)  # #13a10e
+NORMAL_YELLOW: Final = (193, 156, 0)  # #c19c00
+NORMAL_BLUE: Final = (0, 55, 218)  # #0037da
+NORMAL_MAGENTA: Final = (136, 23, 152)  # #881798
+NORMAL_CYAN: Final = (58, 150, 221)  # #3a96dd
+NORMAL_WHILE: Final = (204, 204, 204)  # #cccccc
+# dim color
+DIM_BLACK: Final = (6, 6, 6)  # #060606
+DIM_RED: Final = (98, 7, 15)  # #62070f
+DIM_GREEN: Final = (9, 80, 7)  # #095007
+DIM_YELLOW: Final = (96, 78, 0)  # #604e00
+DIM_BLUE: Final = (0, 27, 109)  # #001b6d
+DIM_MAGENTA: Final = (68, 11, 76)  # #440b4c
+DIM_CYAN: Final = (29, 75, 110)  # #1d4b6e
+DIM_WHILE: Final = (102, 102, 102)  # #666666
+# bright color
+BRIGHT_BLACK: Final = (118, 118, 118)  # #767676
+BRIGHT_RED: Final = (231, 72, 86)  # #e74856
+BRIGHT_GREEN: Final = (22, 198, 12)  # #16c60c
+BRIGHT_YELLOW: Final = (249, 241, 165)  # #f9f1a5
+BRIGHT_BLUE: Final = (59, 120, 255)  # #3b78ff
+BRIGHT_MAGENTA: Final = (180, 0, 158)  # #b4009e
+BRIGHT_CYAN: Final = (97, 214, 214)  # #61d6d6
+BRIGHT_WHILE: Final = (242, 242, 242)  # #f2f2f2
 
 # 颜色选择器
-switcher: Final = {
-    BLACK: Fore.BLACK,
-    RED: Fore.RED,
-    GREEN: Fore.GREEN,
-    YELLOW: Fore.YELLOW,
-    BLUE: Fore.BLUE,
-    MAGENTA: Fore.MAGENTA,
-    CYAN: Fore.CYAN,
-    WHILE: Fore.WHITE,
+switcher = {
+    # normal color
+    NORMAL_BLACK: Style.NORMAL + Fore.BLACK,
+    NORMAL_RED: Style.NORMAL + Fore.RED,
+    NORMAL_GREEN: Style.NORMAL + Fore.GREEN,
+    NORMAL_YELLOW: Style.NORMAL + Fore.YELLOW,
+    NORMAL_BLUE: Style.NORMAL + Fore.BLUE,
+    NORMAL_MAGENTA: Style.NORMAL + Fore.MAGENTA,
+    NORMAL_CYAN: Style.NORMAL + Fore.CYAN,
+    NORMAL_WHILE: Style.NORMAL + Fore.WHITE,
+    # dim color
+    DIM_BLACK: Style.DIM + Fore.BLACK,
+    DIM_RED: Style.DIM + Fore.RED,
+    DIM_GREEN: Style.DIM + Fore.GREEN,
+    DIM_YELLOW: Style.DIM + Fore.YELLOW,
+    DIM_BLUE: Style.DIM + Fore.BLUE,
+    DIM_MAGENTA: Style.DIM + Fore.MAGENTA,
+    DIM_CYAN: Style.DIM + Fore.CYAN,
+    DIM_WHILE: Style.DIM + Fore.WHITE,
+    # bright color
+    BRIGHT_BLACK: Style.BRIGHT + Fore.BLACK,  # Fore.LIGHTBLACK_EX
+    BRIGHT_RED: Style.BRIGHT + Fore.RED,  # Fore.LIGHTRED_EX
+    BRIGHT_GREEN: Style.BRIGHT + Fore.GREEN,  # Fore.LIGHTGREEN_EX
+    BRIGHT_YELLOW: Style.BRIGHT + Fore.YELLOW,  # Fore.LIGHTWHITE_EX
+    BRIGHT_BLUE: Style.BRIGHT + Fore.BLUE,  #  Fore.LIGHTBLUE_EX
+    BRIGHT_MAGENTA: Style.BRIGHT + Fore.MAGENTA,  # Fore.LIGHTMAGENTA_EX
+    BRIGHT_CYAN: Style.BRIGHT + Fore.CYAN,  # Fore.LIGHTCYAN_EX
+    BRIGHT_WHILE: Style.BRIGHT + Fore.WHITE,  # Fore.LIGHTYELLOW_EX
 }
 
 
@@ -92,67 +130,55 @@ def merge_va(input_video_path: str, input_audio_path: str, output_file_path: str
         logger.info(f'{stderr}')
 
 
-def get_color_codes(rgb: Sequence[Sequence[int]]) -> list[str]:
+def get_color_codes(data: Sequence[Sequence[int]], enhance_color: bool = True) -> list[str]:
     '''
     获取颜色映射代码列表
     ---
-    :param rgb: rgb list-like or ndarray, shape=(N, 3)
+    :param data: rgb list-like or ndarray, shape=(N, 3)
+    :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色，可选。默认为 True
     :return: 颜色映射代码列表
     '''
     #! 使用矢量化操作提高性能，并配合 numpy 默认行存储的特性对其内存布局进行计算优化，以保证所有的计算都发生在行操作 (axis=1) 而非列操作 (axis=0) 上
+    if enhance_color:
+        colormap = list(switcher.keys())
+    else:
+        colormap = list(switcher.keys())[:8]
     # 输入的 rgb 颜色，shape=(N, 1, 3)
-    rgb = np.asarray(rgb, dtype=np.uint8).reshape(-1, 1, 3)
+    rgbs = np.asarray(data, dtype=np.uint8).reshape(-1, 1, 3)
     # rgb 颜色列表，shape=(M, 1, 3)
-    colors = np.asarray(list(switcher.keys()), np.uint8).reshape(-1, 1, 3)
+    colors = np.asarray(colormap, np.uint8).reshape(-1, 1, 3)
     # 判断 rgb 颜色与 colors 颜色列表大小，以适用不同策略，进行计算优化
-    N, M = rgb.shape[0], colors.shape[0]
+    N, M = rgbs.shape[0], colors.shape[0]
+    # 将 rgb 颜色转换为 lab 颜色，shape=(N, 3)
+    labs = cv.cvtColor(rgbs, cv.COLOR_RGB2LAB).reshape(-1, 3)
+    # 将 rgb 颜色列表转换为 lab 颜色列表，shape=(M, 3)
+    lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB).reshape(-1, 3)
     #! 大多数情况下，N >> M
     if M < N:
-        # 将 rgb 颜色转换为 lab 颜色，shape=(N, 3)
-        lab = cv.cvtColor(rgb, cv.COLOR_RGB2LAB).reshape(-1, 3)
-        # 将 rgb 颜色列表转换为 lab 颜色列表，shape=(M, 1, 3)
-        lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB)
-        # N 个颜色分别和 M 个颜色之间的距离，shape=(M, N)
-        distances = []
-        # 遍历 M 次，依次找到 N 个颜色和 M 个颜色之间的距离，每轮循环获得 M 个颜色中的一个与 N 个颜色的距离
-        for i in range(M):
-            # 使用 CIEDE 2000 标准给出的色差，计算所有颜色之间的距离，shape=(N, )
-            distance = deltaE_ciede2000(lab, lab_colors[i], channel_axis=-1)
-            # 添加 M 个颜色中的一个与 N 个颜色的距离
-            distances.append(distance)
-        # 找到最小距离的索引
-        min_index = np.argmin(np.asarray(distances).T, axis=1)
-        # 最佳匹配颜色，shape=(N, 3)
-        best_color = colors[min_index].reshape(-1, 3)
-        # 返回颜色映射代码
-        return [switcher.get(tuple(bc), Fore.BLACK) for bc in best_color]
+        # 计算所有颜色之间的距离，shape=(M, N)，并将其转置以匹配形状 (N, M)，采用行操作 (axis=1) 而非列操作 (axis=0)
+        lab_colors = lab_colors[:, np.newaxis, :]
+        distances = np.asarray([deltaE_ciede2000(labs, lab_color, channel_axis=-1) for lab_color in lab_colors]).T
     else:
-        # 将 rgb 颜色转换为 lab 颜色，shape=(N, 1, 3)
-        lab = cv.cvtColor(rgb, cv.COLOR_RGB2LAB)
-        # 将 rgb 颜色列表转换为 lab 颜色列表，shape=(M, 3)
-        lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB).reshape(-1, 3)
-        # N 个颜色在 M 个颜色之中，与其最近的颜色，shape=(N, )
-        best_color = []
-        # 遍历 N 次，依次找到 N 个颜色在 M 个颜色之中，与其最近的颜色，每轮循环确定 N 个颜色中的一个在 M 个颜色最近的颜色
-        for i in range(N):
-            # 使用 CIEDE 2000 标准给出的色差，计算所有颜色之间的距离，shape=(M, )
-            distances = deltaE_ciede2000(lab_colors, lab[i], channel_axis=-1)
-            # 找到最小距离的索引
-            min_index = np.argmin(distances)
-            # 最佳匹配颜色，shape=(3, )
-            best_color.append(colors[min_index].reshape(3))
-        # 返回颜色映射代码
-        return [switcher.get(tuple(bc), Fore.BLACK) for bc in best_color]
+        # 计算所有颜色之间的距离，shape=(N, M)
+        labs = labs[:, np.newaxis, :]
+        distances = np.asarray([deltaE_ciede2000(lab_colors, lab, channel_axis=-1) for lab in labs])
+    # 找到最小距离的索引，shape=(N, )
+    min_index = np.argmin(distances, axis=1)
+    # 最佳匹配颜色，shape=(N, 3)
+    best_color = colors[min_index].reshape(-1, 3)
+    # 返回颜色映射代码
+    return [switcher.get(tuple(bc), Style.NORMAL + Fore.BLACK) for bc in best_color]
 
 
-def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool) -> bool:
+def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool = True, enhance_color: bool = True) -> bool:
     '''
     视频转文本
     ---
     :param input_video_path: 携带视频信息的输入文件路径
     :param output_txt_dir: 输出视频帧文本的文件夹路径
     :param aspect: 预处理为文本前，将图像宽高放缩至不小于该参数
-    :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边
+    :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边，可选。默认为 True
+    :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色，可选。默认为 True
     :return: 若转换成功，返回 True，否则返回 False
     '''
     # 打开视频
@@ -215,7 +241,7 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
             # 转换为 rgb
             rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
             # 获取颜色映射代码列表
-            rgb_color_codes = get_color_codes(rgb.reshape(-1, 3))
+            rgb_color_codes = get_color_codes(rgb.reshape(-1, 3), enhance_color=enhance_color)
             # 将二值化图像替换为符号
             with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
                 # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
@@ -228,7 +254,7 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
             current_frame += 1
     capture.release()
     end = time.time()
-    logger.info(f'文本转换完成，处理时间：{end - start}s')
+    logger.info(f'文本转换完成，处理时间：{end - start}s，平均每帧 {(end - start) / (current_frame - 1)}s')
     return True
 
 
@@ -254,7 +280,7 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
         with open(os.path.join(input_txt_dir, file), 'r', encoding='utf-8') as f:
             symbols.append(f.read())
     end = time.time()
-    logger.info(f'读取文件完成，处理时间：{end - start}s')
+    logger.info(f'读取文件完成，处理时间：{end - start}s，平均每帧 {(end - start) / len(files)}s')
     # 播放音乐
     playsound(input_audio_path, block=False)
     # 依次打印每个文本文件内容
