@@ -1,5 +1,5 @@
 '''
-修改 processing.py 的 get_color_codes 函数，为其添加 color_func 与 func_kwargs 参数以测试不同颜色对比之间的差异
+修改 processing.py 的 get_color_codes 函数，为其添加 color_func 与 func_kwargs 参数以测试不同颜色函数对比之间的差异
 '''
 
 from colorama import just_fix_windows_console, Fore, Back, Style, Cursor
