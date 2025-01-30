@@ -1,7 +1,7 @@
 from colorama import just_fix_windows_console, Fore, Back, Style, Cursor
-from skimage.color import deltaE_ciede2000
+from skimage.color import deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc
 from playsound import playsound
-from typing import Sequence, MutableSequence, Final
+from typing import Sequence, MutableSequence, Final, Callable
 from rich.progress import track
 import subprocess
 import numpy as np
@@ -130,11 +130,47 @@ def merge_va(input_video_path: str, input_audio_path: str, output_file_path: str
         logger.info(f'{stderr}')
 
 
-def get_color_codes(data: Sequence[Sequence[int]], enhance_color: bool = True) -> list[str]:
+def deltaE_rgb(rgb1: Sequence[Sequence[int]], rgb2: Sequence[Sequence[int]], channel_axis: int = -1, weight: Sequence[int] = (1, 1, 1)):
+    '''
+    附带权重的 RGB 色彩空间中两点之间的欧几里得距离
+    ---
+    Reference
+    ---
+    https://wikimedia.org/api/rest_v1/media/math/render/svg/766971fac976a11f71166fb485df533072c886fb
+    '''
+    r1, g1, b1 = np.moveaxis(rgb1.astype(np.float32), source=channel_axis, destination=0)[:3]
+    r2, g2, b2 = np.moveaxis(rgb2.astype(np.float32), source=channel_axis, destination=0)[:3]
+    r_w, g_w, b_w = weight
+    return np.sqrt(r_w * (r2 - r1)**2 + g_w * (g2 - g1)**2 + b_w * (b2 - b1)**2)
+
+
+def deltaE_approximation_rgb(rgb1: Sequence[Sequence[int]], rgb2: Sequence[Sequence[int]], channel_axis: int = -1):
+    '''
+    一种低成本近似方法
+    这个公式的结果非常接近 L*u*v*（具有修改后的亮度曲线），更重要的是，它是一种更稳定的算法：它不存在一个颜色范围，在这个范围内会突然给出远离最优结果的结果
+    ---
+    Reference
+    ---
+    https://wikimedia.org/api/rest_v1/media/math/render/svg/766971fac976a11f71166fb485df533072c886fb
+    https://web.archive.org/web/20210327221240/https://www.compuphase.com/cmetric.htm
+    '''
+    r1, g1, b1 = np.moveaxis(rgb1.astype(np.float32), source=channel_axis, destination=0)[:3]
+    r2, g2, b2 = np.moveaxis(rgb2.astype(np.float32), source=channel_axis, destination=0)[:3]
+    r_mean = (r1 + r2) / 2
+    delat_r = r2 - r1
+    delat_g = g2 - g1
+    delta_b = b2 - b1
+    return np.sqrt((2 + r_mean / 256) * delat_r**2 + 4 * delat_g**2 + (2 + (255 - r_mean) / 256) * delta_b**2)
+
+
+def get_color_codes(data: Sequence[Sequence[int]], func: Callable = deltaE_ciede2000, mode: str = 'lab', func_kwargs: dict = {}, enhance_color: bool = True) -> list[str]:
     '''
     获取颜色映射代码列表
     ---
     :param data: rgb list-like or ndarray, shape=(N, 3)
+    :param func: 衡量颜色差异的可调用对象，该函数接受的第一个参数为参考颜色，第二个参数为比较颜色，函数签名请阅览 skimage.color 中提供的 deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc 函数。可选。默认为 skimage.color.deltaE_ciede2000
+    :param mode: 衡量 data 颜色差异的颜色空间，必须与 func 计算所使用的颜色空间对应，可选。默认为 'lab'
+    :param func_kwargs: 要传递给 func 的关键字参数，可选。默认为空字典
     :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色，可选。默认为 True
     :return: 颜色映射代码列表
     '''
@@ -149,19 +185,29 @@ def get_color_codes(data: Sequence[Sequence[int]], enhance_color: bool = True) -
     colors = np.asarray(colormap, np.uint8).reshape(-1, 1, 3)
     # 判断 rgb 颜色与 colors 颜色列表大小，以适用不同策略，进行计算优化
     N, M = rgbs.shape[0], colors.shape[0]
-    # 将 rgb 颜色转换为 lab 颜色，shape=(N, 3)
-    labs = cv.cvtColor(rgbs, cv.COLOR_RGB2LAB).reshape(-1, 3)
-    # 将 rgb 颜色列表转换为 lab 颜色列表，shape=(M, 3)
-    lab_colors = cv.cvtColor(colors, cv.COLOR_RGB2LAB).reshape(-1, 3)
+    # 匹配模式
+    match mode.lower():
+        case 'rgb':
+            # rgb 比较颜色，shape=(N, 3)
+            comparison_colors = rgbs.reshape(-1, 3)
+            # rgb 参考颜色，shape=(M, 3)
+            reference_colormap = colors.reshape(-1, 3)
+        case 'lab':
+            # lab 比较颜色，shape=(N, 3)
+            comparison_colors = cv.cvtColor(rgbs, cv.COLOR_RGB2LAB).reshape(-1, 3)
+            # lab 参考颜色，shape=(M, 3)
+            reference_colormap = cv.cvtColor(colors, cv.COLOR_RGB2LAB).reshape(-1, 3)
+        case _:
+            raise NotImplementedError()
     #! 大多数情况下，N >> M
     if M < N:
         # 计算所有颜色之间的距离，shape=(M, N)，并将其转置以匹配形状 (N, M)，采用行操作 (axis=1) 而非列操作 (axis=0)
-        lab_colors = lab_colors[:, np.newaxis, :]
-        distances = np.asarray([deltaE_ciede2000(labs, lab_color, channel_axis=-1) for lab_color in lab_colors]).T
+        reference_colormap = reference_colormap[:, np.newaxis, :]
+        distances = np.asarray([func(reference_color, comparison_colors, **func_kwargs) for reference_color in reference_colormap]).T
     else:
         # 计算所有颜色之间的距离，shape=(N, M)
-        labs = labs[:, np.newaxis, :]
-        distances = np.asarray([deltaE_ciede2000(lab_colors, lab, channel_axis=-1) for lab in labs])
+        comparison_colors = comparison_colors[:, np.newaxis, :]
+        distances = np.asarray([func(reference_colormap, comparison_color, **func_kwargs) for comparison_color in comparison_colors])
     # 找到最小距离的索引，shape=(N, )
     min_index = np.argmin(distances, axis=1)
     # 最佳匹配颜色，shape=(N, 3)
