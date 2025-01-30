@@ -84,7 +84,7 @@ def split_va(input_file_path: str, output_video_path: str, output_audio_path: st
     :return: None
     '''
     # 拆分视频
-    cmds = [f'ffmpeg -i {input_file_path} -an -c:v {output_video_path}', f'ffmpeg -i {input_file_path} -vn -c:a {output_audio_path}']
+    cmds = [f'ffmpeg -i {input_file_path} -an -c:v copy {output_video_path}', f'ffmpeg -i {input_file_path} -vn -c:a copy {output_audio_path}']
     for cmd in cmds:
         command = subprocess.run(
             cmd,
