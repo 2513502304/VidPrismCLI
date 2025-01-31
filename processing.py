@@ -92,7 +92,7 @@ def split_va(input_file_path: str, output_video_path: str, output_audio_path: st
             capture_output=True,
             check=True,
         )
-        args = ' '.join(command.args)
+        args = command.args
         returncode = command.returncode
         stdout = command.stdout.decode('utf-8')
         stderr = command.stderr.decode('utf-8')
