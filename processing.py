@@ -84,7 +84,9 @@ def split_va(input_file_path: str, output_video_path: str, output_audio_path: st
     :return: None
     '''
     # 拆分视频
-    cmds = [f'ffmpeg -i {input_file_path} -an -c:v copy {output_video_path}', f'ffmpeg -i {input_file_path} -vn -c:a copy {output_audio_path}']
+    cmds = [
+        f'ffmpeg -i "{input_file_path}" -an -c:v copy "{output_video_path}"', f'ffmpeg -i "{input_file_path}" -vn -c:a copy "{output_audio_path}"',
+    ]
     for cmd in cmds:
         command = subprocess.run(
             cmd,
@@ -112,7 +114,9 @@ def merge_va(input_video_path: str, input_audio_path: str, output_file_path: str
     :return: None
     '''
     # 合成视频
-    cmds = [f'ffmpeg -i {input_video_path} -i {input_audio_path} -c:v copy -c:a copy {output_file_path}']
+    cmds = [
+        f'ffmpeg -i "{input_video_path}" -i "{input_audio_path}" -c:v copy -c:a copy "{output_file_path}"',
+    ]
     for cmd in cmds:
         command = subprocess.run(
             cmd,
