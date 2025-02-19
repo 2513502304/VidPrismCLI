@@ -2,7 +2,7 @@
 Author: 未来可欺 2513502304@qq.com
 Date: 2025-01-24 15:27:02
 LastEditors: 未来可欺 2513502304@qq.com
-LastEditTime: 2025-01-27 15:29:55
+LastEditTime: 2025-02-19 20:12:04
 Description: 命令行中打印的彩色视频
 '''
 
@@ -40,12 +40,13 @@ def main():
             os.makedirs(audio_dir)
         video_path = os.path.join(video_dir, file_name)
         audio_path = os.path.join(audio_dir, file_name)
-        # 拆分音视频
-        split_va(
-            input_file_path=settings.file_path,
-            output_video_path=video_path,
-            output_audio_path=audio_path,
-        )
+        if not os.path.exists(video_path) and not os.path.exists(video_path):
+            # 拆分音视频
+            split_va(
+                input_file_path=settings.file_path,
+                output_video_path=video_path,
+                output_audio_path=audio_path,
+            )
     else:
         video_path = settings.video_path
         audio_path = settings.audio_path
