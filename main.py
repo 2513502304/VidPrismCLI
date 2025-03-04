@@ -2,17 +2,18 @@
 Author: 未来可欺 2513502304@qq.com
 Date: 2025-01-24 15:27:02
 LastEditors: 未来可欺 2513502304@qq.com
-LastEditTime: 2025-02-19 20:12:04
+LastEditTime: 2025-03-04 19:34:45
 Description: 命令行中打印的彩色视频
 '''
 
 import cv2 as cv
 import os
 from processing import split_va, merge_va, show
-try:
-    from cy_video2txt import video2txt  # Cython 代码相比于 Python 代码具有更稳定的性能，每次运行的时长标准差相较于更小
-except ModuleNotFoundError as e:
-    from processing import video2txt
+# try:
+#     from cy_video2txt import video2txt  # Cython 代码相比于 Python 代码具有更稳定的性能，每次运行的时长标准差相较于更小
+# except ModuleNotFoundError as e:
+#     from processing import video2txt
+from processing import video2txt
 from utils import logger
 import settings
 
@@ -58,6 +59,7 @@ def main():
             aspect=settings.aspect,
             enhance_detail=settings.enhance_detail,
             enhance_color=settings.enhance_color,
+            color_mode=settings.color_mode,
     ):
         # 在命令行中打印彩色视频
         show(
