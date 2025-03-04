@@ -4,7 +4,7 @@ import numpy as np
 import cv2 as cv
 import string
 import random
-from processing import deltaE_rgb, deltaE_approximation_rgb, get_color_codes
+from processing import deltaE_rgb, deltaE_approximation_rgb, get_color_codes, ufunc_pixel2color_codes
 
 
 def show_color_metric_difference(data: Sequence[Sequence[int]], func: callable, mode: str = 'lab', func_kwargs: dict = {}) -> None:
@@ -61,3 +61,9 @@ if __name__ == '__main__':
     show_color_metric_difference(rgb, deltaE_cmc, func_kwargs={'kL': 1})
     # deltaE_cmc with kL=2
     show_color_metric_difference(rgb, deltaE_cmc, func_kwargs={'kL': 2})
+
+    # # true color
+    # h, w = rgb.shape[:2]
+    # rgb_color_codes = ufunc_pixel2color_codes(rgb[..., 0], rgb[..., 1], rgb[..., 2]).reshape(-1)
+    # symbols = [c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2)) for i, c in enumerate(rgb_color_codes)]
+    # print(''.join(symbols))
