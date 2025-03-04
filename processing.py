@@ -2,6 +2,7 @@ from colorama import just_fix_windows_console, Fore, Back, Style, Cursor
 from skimage.color import deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc
 from playsound import playsound
 from typing import Sequence, MutableSequence, Final, Callable
+from enum import Enum, auto
 from rich.progress import track
 import subprocess
 import numpy as np
@@ -179,6 +180,7 @@ def get_color_codes(data: Sequence[Sequence[int]], func: Callable = deltaE_ciede
     :return: 颜色映射代码列表
     '''
     #! 使用矢量化操作提高性能，并配合 numpy 默认行存储的特性对其内存布局进行计算优化，以保证所有的计算都发生在行操作 (axis=1) 而非列操作 (axis=0) 上
+    # 是否增强颜色细节，由 8 色添加到 24 色
     if enhance_color:
         colormap = list(switcher.keys())
     else:
@@ -220,17 +222,34 @@ def get_color_codes(data: Sequence[Sequence[int]], func: Callable = deltaE_ciede
     return [switcher.get(tuple(bc), Style.NORMAL + Fore.BLACK) for bc in best_color]
 
 
-def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool = True, enhance_color: bool = True) -> bool:
+class COLORMODE(Enum):
+    '''颜色模式'''
+    CLUSTERCOLOR = auto() # 聚类色
+    TRUECOLOR = auto() # 真彩色
+
+# 转换为 ANSI 转义序列，使用 np.frompyfunc 创建 ufunc
+ufunc_pixel2color_codes = np.frompyfunc(lambda r, g, b: f'\033[38;2;{r};{g};{b}m', 3, 1)
+
+
+def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool = True, enhance_color: bool = True, color_mode: COLORMODE | str = COLORMODE.CLUSTERCOLOR) -> bool:
     '''
     视频转文本
     ---
     :param input_video_path: 携带视频信息的输入文件路径
     :param output_txt_dir: 输出视频帧文本的文件夹路径
     :param aspect: 预处理为文本前，将图像宽高放缩至不小于该参数
-    :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边，可选。默认为 True
-    :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色，可选。默认为 True
+    :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False，可选。默认为 True
+    :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色。仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 True
+    :param color_mode: 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一，可选。默认为 CLUSTERCOLOR
     :return: 若转换成功，返回 True，否则返回 False
     '''
+    # 颜色模式
+    if isinstance(color_mode, COLORMODE):
+        pass
+    elif isinstance(color_mode, str):
+        color_mode = color_mode.upper()
+    else:
+        raise ValueError()
     # 打开视频
     capture = cv.VideoCapture(input_video_path)
     # 若视频打开失败
@@ -264,6 +283,7 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
     current_frame = 1
     logger.info('正在对视频帧进行文本转换，请稍后')
     start = time.time()
+    # 处理视频的每一帧图像
     with console.status('文本转换中...', spinner='earth') as status:
         while True:
             s = time.time()
@@ -290,8 +310,14 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
                 image[edges == 255] = 255
             # 转换为 rgb
             rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-            # 获取颜色映射代码列表
-            rgb_color_codes = get_color_codes(rgb.reshape(-1, 3), enhance_color=enhance_color)
+            # 真彩色模式
+            if color_mode == COLORMODE.TRUECOLOR or color_mode == COLORMODE.TRUECOLOR.name:
+                # 获取颜色映射代码列表
+                rgb_color_codes = ufunc_pixel2color_codes(rgb[..., 0], rgb[..., 1], rgb[..., 2]).reshape(-1)
+            # 8/24 色模式
+            elif color_mode == COLORMODE.CLUSTERCOLOR or color_mode == COLORMODE.CLUSTERCOLOR.name:
+                # 获取颜色映射代码列表
+                rgb_color_codes = get_color_codes(rgb.reshape(-1, 3), enhance_color=enhance_color)
             # 将二值化图像替换为符号
             with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
                 # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
@@ -353,4 +379,4 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
         else:  # 跳过当前帧，以实现抽帧效果，与音频同步
             continue
     # reset all settings
-    print(Fore.RESET, Back.RESET, Style.RESET_ALL)
+    print(Fore.RESET + Back.RESET + Style.RESET_ALL)
