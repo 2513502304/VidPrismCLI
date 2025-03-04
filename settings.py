@@ -18,8 +18,11 @@ output_dir = './Data'
 # 同时，若该值过小，则会导致输出质量较差
 aspect = 256
 
-# 是否增强图像细节，为图像边缘添加白色描边
-enhance_detail = True
+# 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False
+enhance_detail = False
 
-# 是否增强颜色细节，由 8 色添加到 24 色
+# 是否增强颜色细节，由 8 色添加到 24 色。仅在 color_mode 为 CLUSTERCOLOR 时使用
 enhance_color = True
+
+# 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一
+color_mode = 'TRUECOLOR'
