@@ -11,7 +11,7 @@
 ### 真彩色模式，保留最大的图像色彩细节，在命令行中输出
 ![茜特菈莉真彩色](https://github.com/user-attachments/assets/2519fadc-6d0f-4d4c-92ef-7f7dea7304b5)
 ## ***References***
-- [1] https://en.wikipedia.org/wiki/Color_difference
-- [2] http://www.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf DOI:10.1364/AO.33.008069
-- [3] M. Melgosa, J. Quesada, and E. Hita, “Uniformity of some recent color metrics tested with an accurate color-difference tolerance dataset,” Appl. Opt. 33, 8069-8077 (1994).
-
+- [1] https://en.wikipedia.org/wiki/ANSI_escape_code
+- [2] https://en.wikipedia.org/wiki/Color_difference
+- [3] http://www.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf DOI:10.1364/AO.33.008069
+- [4] M. Melgosa, J. Quesada, and E. Hita, “Uniformity of some recent color metrics tested with an accurate color-difference tolerance dataset,” Appl. Opt. 33, 8069-8077 (1994).
