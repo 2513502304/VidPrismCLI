@@ -359,6 +359,8 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
     logger.info(f'读取文件完成，处理时间：{end - start}s，平均每帧 {(end - start) / len(files)}s')
     # 播放音乐
     playsound(input_audio_path, block=False)
+    # 将光标移动到起始位置
+    pos = Cursor.POS()
     # 依次打印每个文本文件内容
     start_time = time.time()
     for i, symbol in enumerate(symbols):
@@ -372,11 +374,13 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
         delta_time = elapsed_time - expected_time
         # 若生成文本文件内容过小，则 print 操作相对快速
         if delta_time < 0:  # 减慢打印速度
-            os.system('cls')
-            print(symbol, flush=True)
+            # 将光标移动到起始位置，原地更新内容，减少屏幕闪烁
+            print(pos + symbol, flush=True)
             time.sleep(interval - delta_time)
         # 若生成文本文件内容过大，则 print 操作相对耗时
         else:  # 跳过当前帧，以实现抽帧效果，与音频同步
             continue
+    # 清屏
+    os.system('cls')
     # reset all settings
     print(Fore.RESET + Back.RESET + Style.RESET_ALL)
