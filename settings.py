@@ -4,6 +4,9 @@ video_path = './Data/《原神》角色预告-「茜特菈莉：星之眼的注�
 # 仅携带音频信息的输入文件路径
 audio_path = './Data/《原神》角色预告-「茜特菈莉：星之眼的注视」.m4a'
 
+# 命令行窗口标题
+title = '《原神》角色预告-「茜特菈莉：星之眼的注视」'
+
 # 携带音视频信息的输入文件路径，若给出该参数，则忽略 video_path 与 audio_path 参数
 file_path = None
 
@@ -26,3 +29,6 @@ enhance_color = True
 
 # 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一
 color_mode = 'TRUECOLOR'
+
+# 是否减小内存占用，使用游程编码，开启此选项可显著减少每个视频帧的文本文件大小，但会略微减慢视频转换的处理速度
+enhance_memory = True
