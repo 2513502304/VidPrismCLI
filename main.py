@@ -2,7 +2,7 @@
 Author: 未来可欺 2513502304@qq.com
 Date: 2025-01-24 15:27:02
 LastEditors: 未来可欺 2513502304@qq.com
-LastEditTime: 2025-03-04 19:34:45
+LastEditTime: 2025-03-07 02:07:31
 Description: 命令行中打印的彩色视频
 '''
 
@@ -60,11 +60,13 @@ def main():
             enhance_detail=settings.enhance_detail,
             enhance_color=settings.enhance_color,
             color_mode=settings.color_mode,
+            enhance_memory=settings.enhance_memory,
     ):
         # 在命令行中打印彩色视频
         show(
             input_txt_dir=txt_dir,
             input_audio_path=audio_path,
+            title=settings.title,
             interval=interval,
         )
 
