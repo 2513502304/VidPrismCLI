@@ -1,4 +1,5 @@
 from colorama import just_fix_windows_console, Fore, Back, Style, Cursor
+from colorama.ansi import code_to_chars, set_title, clear_screen, clear_line
 from skimage.color import deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc
 from playsound import playsound
 from typing import Sequence, MutableSequence, Final, Callable
@@ -227,11 +228,74 @@ class COLORMODE(Enum):
     CLUSTERCOLOR = auto() # 聚类色
     TRUECOLOR = auto() # 真彩色
 
+
 # 转换为 ANSI 转义序列，使用 np.frompyfunc 创建 ufunc
 ufunc_pixel2color_codes = np.frompyfunc(lambda r, g, b: f'\033[38;2;{r};{g};{b}m', 3, 1)
 
 
-def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool = True, enhance_color: bool = True, color_mode: COLORMODE | str = COLORMODE.CLUSTERCOLOR) -> bool:
+class RLC():
+    '''游程编码类，支持灰度图像和彩色图像的游程编码'''
+
+    def __init__(self, image: np.ndarray) -> None:
+        self.image = image
+        self.height, self.width = image.shape[:2]
+        try:
+            self.channel = image.shape[2]
+        except:
+            self.channel = 1
+        self.rindex_map = {index: [] for index in range(self.height)}
+
+    def encode(self) -> dict:
+        '''游程编码'''
+        # 遍历图像像素
+        for i in range(self.height):
+            # 当前行
+            row = self.image[i]
+            # 灰度图像
+            if self.channel == 1:
+                # 逐行像素值依次相减找到变化点
+                diff = np.diff(row, n=1, axis=-1, prepend=row[0] - 1)
+                # 获取当前行变化点的索引
+                row_idx = np.where(diff != 0)[0]
+            # 彩色图像
+            else:
+                # 逐行像素值依次相减找到变化点
+                diff = np.diff(row, n=1, axis=0, prepend=[row[0] - 1])
+                # 获取当前行变化点的索引
+                row_idx = np.where(np.any(diff != 0, axis=-1))[0]
+            # 获取当前行游程值
+            values = row[row_idx]
+            # 计算当前行游程值长度
+            counts = np.diff(np.append(row_idx, self.width), n=1, axis=-1)
+            # 存储编码
+            self.rindex_map[i] = list(zip(values, counts))
+        return self.rindex_map
+
+    def decode(self, rindex_map: dict = None) -> np.ndarray:
+        '''游程解码'''
+        if rindex_map is None:
+            rindex_map = self.rindex_map
+        # 灰度图像
+        if self.channel == 1:
+            image = np.zeros((self.height, self.width), dtype=self.image.dtype)
+        # 彩色图像
+        else:
+            image = np.zeros((self.height, self.width, self.channel), dtype=self.image.dtype)
+        # 遍历行索引表
+        for index, value in rindex_map.items():
+            # 解码当前行
+            if self.channel == 1:
+                # 灰度图像
+                pixels = np.concatenate([np.repeat(record[0], record[1]) for record in value])
+            else:
+                # 彩色图像
+                pixels = np.concatenate([np.tile(record[0], (record[1], 1)) for record in value])
+            # 填充到图像中
+            image[index] = pixels
+        return image
+    
+
+def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_detail: bool = True, enhance_color: bool = True, color_mode: COLORMODE | str = COLORMODE.CLUSTERCOLOR, enhance_memory: bool = True) -> bool:
     '''
     视频转文本
     ---
@@ -241,6 +305,7 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
     :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False，可选。默认为 True
     :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色。仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 True
     :param color_mode: 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一，可选。默认为 CLUSTERCOLOR
+    :param enhance_memory: 是否减小内存占用，使用游程编码，开启此选项可显著减少每个视频帧的文本文件大小，但会略微减慢视频转换的处理速度，可选。默认为 True
     :return: 若转换成功，返回 True，否则返回 False
     '''
     # 颜色模式
@@ -310,21 +375,47 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
                 image[edges == 255] = 255
             # 转换为 rgb
             rgb = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-            # 真彩色模式
-            if color_mode == COLORMODE.TRUECOLOR or color_mode == COLORMODE.TRUECOLOR.name:
-                # 获取颜色映射代码列表
-                rgb_color_codes = ufunc_pixel2color_codes(rgb[..., 0], rgb[..., 1], rgb[..., 2]).reshape(-1)
-            # 8/24 色模式
-            elif color_mode == COLORMODE.CLUSTERCOLOR or color_mode == COLORMODE.CLUSTERCOLOR.name:
-                # 获取颜色映射代码列表
-                rgb_color_codes = get_color_codes(rgb.reshape(-1, 3), enhance_color=enhance_color)
-            # 将二值化图像替换为符号
-            with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
-                # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
-                symbols = [
-                    c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2)) for i, c in enumerate(rgb_color_codes)
-                ]
-                f.write(''.join(symbols))
+            # 使用游程编码
+            if enhance_memory:
+                # 游程编码
+                rindex_map = RLC(rgb).encode()
+                # 符号集
+                symbols = ''
+                # 遍历行索引表
+                for index, value in rindex_map.items():
+                    # 解码当前行，仅获取游程值而忽略游程长度（即获取当前行内的唯一连续子像素值）
+                    # inhomogeneous shape
+                    pixels = np.asarray([record[0] for record in value])    # (-1, 3)
+                    counts = np.asarray([record[1] for record in value])    # (-1, )
+                    # 真彩色模式
+                    if color_mode == COLORMODE.TRUECOLOR or color_mode == COLORMODE.TRUECOLOR.name:
+                        # 获取颜色映射代码列表
+                        rgb_color_codes = ufunc_pixel2color_codes(pixels[..., 0], pixels[..., 1], pixels[..., 2])
+                    # 8/24 色模式
+                    elif color_mode == COLORMODE.CLUSTERCOLOR or color_mode == COLORMODE.CLUSTERCOLOR.name:
+                        # 获取颜色映射代码列表
+                        rgb_color_codes = get_color_codes(pixels, enhance_color=enhance_color)
+                    # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
+                    symbols += ''.join([c + ''.join(random.choices(charset, k=2*count)) for c, count in zip(rgb_color_codes, counts)]) + '\n'
+                # 将二值化图像替换为符号
+                with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
+                    f.write(symbols)
+            else:
+                # 真彩色模式
+                if color_mode == COLORMODE.TRUECOLOR or color_mode == COLORMODE.TRUECOLOR.name:
+                    # 获取颜色映射代码列表
+                    rgb_color_codes = ufunc_pixel2color_codes(rgb[..., 0], rgb[..., 1], rgb[..., 2]).reshape(-1)
+                # 8/24 色模式
+                elif color_mode == COLORMODE.CLUSTERCOLOR or color_mode == COLORMODE.CLUSTERCOLOR.name:
+                    # 获取颜色映射代码列表
+                    rgb_color_codes = get_color_codes(rgb.reshape(-1, 3), enhance_color=enhance_color)
+                # 将二值化图像替换为符号
+                with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
+                    # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
+                    symbols = [
+                        c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2)) for i, c in enumerate(rgb_color_codes)
+                    ]
+                    f.write(''.join(symbols))
             e = time.time()
             logger.info(f'第 {current_frame} 帧文本转换完成，处理时间：{e - s}s')
             current_frame += 1
@@ -334,12 +425,13 @@ def video2txt(input_video_path: str, output_txt_dir: str, aspect: int, enhance_d
     return True
 
 
-def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None:
+def show(input_txt_dir: str, input_audio_path: str, title: str = '', interval: float = 0) -> None:
     '''
     在命令行中打印彩色视频
     ---
-    :param output_txt_dir: 输出视频帧文本的文件夹路径
+    :param input_txt_dir: 输出视频帧文本的文件夹路径
     :param input_audio_path: 仅携带音频信息的输入文件路径
+    :param title: 命令行窗口标题，可选。默认为 ''
     :param interval: 控制每次打印的时间间隔，可选。默认为 0
     :return: None
     '''
@@ -359,6 +451,8 @@ def show(input_txt_dir: str, input_audio_path: str, interval: float = 0) -> None
     logger.info(f'读取文件完成，处理时间：{end - start}s，平均每帧 {(end - start) / len(files)}s')
     # 播放音乐
     playsound(input_audio_path, block=False)
+    # 设置命令行窗口标题
+    print(set_title(title))
     # 将光标移动到起始位置
     pos = Cursor.POS()
     # 依次打印每个文本文件内容
