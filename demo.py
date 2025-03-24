@@ -38,8 +38,6 @@ if __name__ == '__main__':
 
     # deltaE_rgb
     show_color_metric_difference(rgb, deltaE_rgb, 'rgb')
-    # deltaE_rgb with weight=(2, 4, 3)
-    show_color_metric_difference(rgb, deltaE_rgb, 'rgb', func_kwargs={'weight': (2, 4, 3)})
 
     # deltaE_approximation_rgb
     show_color_metric_difference(rgb, deltaE_approximation_rgb, 'rgb')
