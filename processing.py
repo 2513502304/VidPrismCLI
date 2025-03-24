@@ -157,7 +157,7 @@ def deltaE_approximation_rgb(rgb1: Sequence[Sequence[int]], rgb2: Sequence[Seque
     ---
     Reference
     ---
-    https://wikimedia.org/api/rest_v1/media/math/render/svg/766971fac976a11f71166fb485df533072c886fb
+    https://wikimedia.org/api/rest_v1/media/math/render/svg/95ee06baaa28944c5b1e06876439d1b579cf03c9
     https://web.archive.org/web/20210327221240/https://www.compuphase.com/cmetric.htm
     '''
     r1, g1, b1 = np.moveaxis(rgb1.astype(np.float32), source=channel_axis, destination=0)[:3]
