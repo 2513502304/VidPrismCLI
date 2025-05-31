@@ -1,6 +1,7 @@
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 import numpy as np
+import subprocess
 import os
 
 if __name__ == '__main__':
@@ -15,7 +16,10 @@ if __name__ == '__main__':
     )]
 
     setup(
-        ext_modules=cythonize(ext_modules, ),
+        ext_modules=cythonize(
+            ext_modules,
+            annotate=True,  # 'cython -a cy_video2txt.pyx'
+        ),
         script_args=[
             'build_ext',
             '-b',
@@ -25,5 +29,3 @@ if __name__ == '__main__':
             '--inplace',
         ],
     )
-
-    os.system('cython -a cy_video2txt.pyx')
