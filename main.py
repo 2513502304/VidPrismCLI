@@ -58,6 +58,7 @@ def main():
             output_txt_dir=txt_dir,
             aspect=settings.aspect,
             enhance_detail=settings.enhance_detail,
+            enhance_lightness=settings.enhance_lightness,
             enhance_color=settings.enhance_color,
             color_mode=settings.color_mode,
             enhance_memory=settings.enhance_memory,
