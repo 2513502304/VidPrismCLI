@@ -10,7 +10,7 @@
 ![茜特菈莉24色](https://github.com/user-attachments/assets/863f2b0b-3655-4b9b-a4a1-4399e3993ef9)
 ### 真彩色模式，保留最大的图像色彩细节，在命令行中输出
 ![茜特菈莉真彩色](https://github.com/user-attachments/assets/2519fadc-6d0f-4d4c-92ef-7f7dea7304b5)
-### 真彩色模式，提升图像亮度细节，在命令行中输出
+### 真彩色模式，进一步提升图像亮度细节，在命令行中输出
 ![茜特菈莉真彩色亮度提升](https://github.com/user-attachments/assets/d11402c3-8065-464b-b9d1-a89dd1ab3b4d)
 ## ***References***
 - [1] https://en.wikipedia.org/wiki/ANSI_escape_code
