@@ -3,16 +3,16 @@ from colorama.ansi import code_to_chars, set_title, clear_screen, clear_line
 from playsound import playsound
 from rich.progress import track
 import subprocess
-import numpy as np
-import os
 import shutil
-import cv2 as cv
+import os
 import time
 import string
 import random
+import numpy as np
+import cv2 as cv
 
 from utils import logger, console
-from color import get_color_codes, COLORMODE
+from color import get_color_codes, ufunc_pixel2color_codes, COLORMODE
 from rlc import RLC
 
 
@@ -77,10 +77,6 @@ def merge_va(input_video_path: str, input_audio_path: str, output_file_path: str
         logger.info(f'{stderr}')
 
 
-# 转换为 ANSI 转义序列，使用 np.frompyfunc 创建 ufunc
-ufunc_pixel2color_codes = np.frompyfunc(lambda r, g, b: f'\033[38;2;{r};{g};{b}m', 3, 1)
-
-
 def ink_ratio(char: str, fontFace: int = cv.FONT_HERSHEY_SIMPLEX, fontScale: float = 1.0, thickness: int = 1) -> float:
     """
     计算字符在其外接矩形（bounding box）内实际被“墨水”覆盖的面积与整个矩形面积的比值
@@ -96,29 +92,24 @@ def ink_ratio(char: str, fontFace: int = cv.FONT_HERSHEY_SIMPLEX, fontScale: flo
     """
     # 计算文本字符串的宽度和高度，返回包含指定文本的矩形框大小以及相对于最底部文本点的基线的 y 坐标
     size, baseline = cv.getTextSize(char, fontFace=fontFace, fontScale=fontScale, thickness=thickness)
-
     # 创建一个黑色图像，大小为包含整个字符的最小外接矩形
     image = np.zeros((size[1] + baseline, size[0]), np.uint8)
-
     # 绘制文本
     cv.putText(image, char, (0, size[1]), fontFace=fontFace, fontScale=fontScale, color=255, thickness=thickness, lineType=cv.LINE_AA, bottomLeftOrigin=False)
-
     # 计算墨水覆盖面积
     ink_area = cv.countNonZero(image)
-
     # 计算外接矩形面积
     bounding_box_area = image.shape[0] * image.shape[1]
-
     return ink_area / bounding_box_area if bounding_box_area > 0 else 0.0
 
 
 def video2txt(input_video_path: str,
               output_txt_dir: str,
               aspect: int,
+              color_mode: COLORMODE | str = COLORMODE.TRUECOLOR,
               enhance_detail: bool = False,
               enhance_lightness: bool = True,
               enhance_color: bool = False,
-              color_mode: COLORMODE | str = COLORMODE.TRUECOLOR,
               enhance_memory: bool = True) -> bool:
     '''
     视频转文本
@@ -126,10 +117,10 @@ def video2txt(input_video_path: str,
     :param input_video_path: 携带视频信息的输入文件路径
     :param output_txt_dir: 输出视频帧文本的文件夹路径
     :param aspect: 预处理为文本前，将图像宽高放缩至不小于该参数
+    :param color_mode: 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一，可选。默认为 CLUSTERCOLOR
     :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False，可选。默认为 True
     :param enhance_lightness: 是否增强亮度细节，按照图像像素亮度排序字符集，优先使用亮度较高的字符，可选。默认为 True
     :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色。仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 True
-    :param color_mode: 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一，可选。默认为 CLUSTERCOLOR
     :param enhance_memory: 是否减小内存占用，使用游程编码，开启此选项可显著减少每个视频帧的文本文件大小，但会略微减慢视频转换的处理速度，可选。默认为 True
     :return: 若转换成功，返回 True，否则返回 False
     '''
@@ -261,26 +252,25 @@ def video2txt(input_video_path: str,
                 elif color_mode == COLORMODE.CLUSTERCOLOR or color_mode == COLORMODE.CLUSTERCOLOR.name:
                     # 获取颜色映射代码列表
                     rgb_color_codes = get_color_codes(rgb.reshape(-1, 3), enhance_color=enhance_color)
+                # 增强亮度细节
+                if enhance_lightness:
+                    # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
+                    symbols = ''.join([
+                        c + ''.join(np.repeat(
+                            char_image[char_position:(char_position := char_position + 1)],
+                            repeats=2,
+                        )) if (i + 1) % w != 0 else '\n' + c + ''.join(np.repeat(
+                            char_image[char_position:(char_position := char_position + 1)],
+                            repeats=2,
+                        )) for i, c in enumerate(rgb_color_codes)
+                    ])
+                else:
+                    # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
+                    symbols = ''.join([
+                        c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2)) for i, c in enumerate(rgb_color_codes)
+                    ])
                 # 将二值化图像替换为符号
                 with open(f'{output_txt_dir}/{video_name}_{current_frame:0>7d}.txt', 'w') as f:
-                    # 增强亮度细节
-                    if enhance_lightness:
-                        # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
-                        symbols = ''.join([
-                            c + ''.join(np.repeat(
-                                char_image[char_position:(char_position := char_position + 1)],
-                                repeats=2,
-                            )) if (i + 1) % w != 0 else '\n' + c + ''.join(np.repeat(
-                                char_image[char_position:(char_position := char_position + 1)],
-                                repeats=2,
-                            )) for i, c in enumerate(rgb_color_codes)
-                        ])
-                    else:
-                        # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
-                        symbols = ''.join([
-                            c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2))
-                            for i, c in enumerate(rgb_color_codes)
-                        ])
                     f.write(symbols)
             e = time.time()
             logger.info(f'第 {current_frame} 帧文本转换完成，处理时间：{e - s}s')
@@ -303,6 +293,8 @@ def show(input_txt_dir: str, input_audio_path: str, title: str = '', interval: f
     '''
     # 修复 Windows 控制台的颜色问题
     just_fix_windows_console()
+    # 设置命令行窗口标题
+    print(set_title(title))
     # 文本文件
     files = os.listdir(input_txt_dir)
     # 文本列表
@@ -317,9 +309,7 @@ def show(input_txt_dir: str, input_audio_path: str, title: str = '', interval: f
     logger.info(f'读取文件完成，处理时间：{end - start}s，平均每帧 {(end - start) / len(files)}s')
     # 播放音乐
     playsound(input_audio_path, block=False)
-    # 设置命令行窗口标题
-    print(set_title(title))
-    # 将光标移动到起始位置
+    # 将光标移动到起始位置字符
     pos = Cursor.POS()
     # 依次打印每个文本文件内容
     start_time = time.time()
