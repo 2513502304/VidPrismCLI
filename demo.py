@@ -1,10 +1,9 @@
-from skimage.color import deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc
 from typing import Sequence, MutableSequence, Final
 import numpy as np
 import cv2 as cv
 import string
 import random
-from processing import deltaE_rgb, deltaE_approximation_rgb, get_color_codes, ufunc_pixel2color_codes
+from color import deltaE_rgb, deltaE_approximation_rgb, deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc, get_color_codes, ufunc_pixel2color_codes
 
 
 def show_color_metric_difference(data: Sequence[Sequence[int]], func: callable, mode: str = 'lab', func_kwargs: dict = {}) -> None:
