@@ -153,6 +153,10 @@ def get_color_codes(data: Sequence[Sequence[int]], func: Callable = deltaE_ciede
     return [switcher.get(tuple(bc), Style.NORMAL + Fore.BLACK) for bc in best_color]
 
 
+# 转换为 ANSI 转义序列，使用 np.frompyfunc 创建 ufunc
+ufunc_pixel2color_codes = np.frompyfunc(lambda r, g, b: f'\033[38;2;{r};{g};{b}m', 3, 1)
+
+
 class COLORMODE(Enum):
     '''颜色模式'''
     CLUSTERCOLOR = auto() # 聚类色
