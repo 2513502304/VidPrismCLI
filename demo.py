@@ -3,10 +3,15 @@ import numpy as np
 import cv2 as cv
 import string
 import random
-from color import deltaE_rgb, deltaE_approximation_rgb, deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc, get_color_codes, ufunc_pixel2color_codes
+from color import deltaE_rgb, deltaE_approximation_rgb, deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc, pixel2cluster_color_code, pixel2true_color_code
 
 
-def show_color_metric_difference(data: Sequence[Sequence[int]], func: callable, mode: str = 'lab', func_kwargs: dict = {}) -> None:
+def show_color_metric_difference(
+    data: Sequence[Sequence[int]],
+    func: callable,
+    mode: str = 'lab',
+    func_kwargs: dict = {},
+) -> None:
     '''
     评估不同颜色差异计算方法的显示效果
     ---
@@ -18,12 +23,12 @@ def show_color_metric_difference(data: Sequence[Sequence[int]], func: callable, 
     h, w = data.shape[:2]
 
     # color 8
-    rgb_color_codes = get_color_codes(data.reshape(-1, 3), enhance_color=False, mode=mode, func=func, func_kwargs=func_kwargs)
+    rgb_color_codes = pixel2cluster_color_code(data.reshape(-1, 3), enhance_color=False, mode=mode, func=func, func_kwargs=func_kwargs)
     symbols = [c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2)) for i, c in enumerate(rgb_color_codes)]
     print(''.join(symbols))
 
     # color 24
-    rgb_color_codes = get_color_codes(data.reshape(-1, 3), mode=mode, func=func, func_kwargs=func_kwargs)
+    rgb_color_codes = pixel2cluster_color_code(data.reshape(-1, 3), mode=mode, func=func, func_kwargs=func_kwargs)
     symbols = [c + ''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + c + ''.join(random.choices(charset, k=2)) for i, c in enumerate(rgb_color_codes)]
     print(''.join(symbols))
 
