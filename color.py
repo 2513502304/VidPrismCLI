@@ -66,7 +66,12 @@ switcher = {
 }
 
 
-def deltaE_rgb(rgb1: Sequence[Sequence[int]], rgb2: Sequence[Sequence[int]], channel_axis: int = -1, weight: Sequence[int] = (1, 1, 1)):
+def deltaE_rgb(
+    rgb1: Sequence[Sequence[int]],
+    rgb2: Sequence[Sequence[int]], 
+    channel_axis: int = -1, 
+    weight: Sequence[int] = (1, 1, 1),
+) -> np.ndarray:
     '''
     附带权重的 RGB 色彩空间中两点之间的欧几里得距离
     ---
@@ -80,7 +85,11 @@ def deltaE_rgb(rgb1: Sequence[Sequence[int]], rgb2: Sequence[Sequence[int]], cha
     return np.sqrt(r_w * (r2 - r1)**2 + g_w * (g2 - g1)**2 + b_w * (b2 - b1)**2)
 
 
-def deltaE_approximation_rgb(rgb1: Sequence[Sequence[int]], rgb2: Sequence[Sequence[int]], channel_axis: int = -1):
+def deltaE_approximation_rgb(
+    rgb1: Sequence[Sequence[int]],
+    rgb2: Sequence[Sequence[int]],
+    channel_axis: int = -1, 
+) -> np.ndarray:
     '''
     一种低成本近似方法
     这个公式的结果非常接近 L*u*v*（具有修改后的亮度曲线），更重要的是，它是一种更稳定的算法：它不存在一个颜色范围，在这个范围内会突然给出远离最优结果的结果
@@ -99,16 +108,22 @@ def deltaE_approximation_rgb(rgb1: Sequence[Sequence[int]], rgb2: Sequence[Seque
     return np.sqrt((2 + r_mean / 256) * delat_r**2 + 4 * delat_g**2 + (2 + (255 - r_mean) / 256) * delta_b**2)
 
 
-def get_color_codes(data: Sequence[Sequence[int]], func: Callable = deltaE_ciede2000, mode: str = 'lab', func_kwargs: dict = {}, enhance_color: bool = True) -> list[str]:
+def pixel2cluster_color(
+    data: Sequence[Sequence[int]], 
+    func: Callable = deltaE_ciede2000, 
+    mode: str = 'lab', 
+    func_kwargs: dict = {}, 
+    enhance_color: bool = True,
+) -> np.ndarray:
     '''
-    获取颜色映射代码列表
+    获取聚类颜色映射列表
     ---
     :param data: rgb list-like or ndarray, shape=(N, 3)
     :param func: 衡量颜色差异的可调用对象，该函数接受的第一个参数为参考颜色，第二个参数为比较颜色，函数签名请阅览 skimage.color 中提供的 deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc 函数。可选。默认为 skimage.color.deltaE_ciede2000
     :param mode: 衡量 data 颜色差异的颜色空间，必须与 func 计算所使用的颜色空间对应，可选。默认为 'lab'
     :param func_kwargs: 要传递给 func 的关键字参数，可选。默认为空字典
     :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色，可选。默认为 True
-    :return: 颜色映射代码列表
+    :return: 聚类颜色映射列表，shape=(N, 3)
     '''
     #! 使用矢量化操作提高性能，并配合 numpy 默认行存储的特性对其内存布局进行计算优化，以保证所有的计算都发生在行操作 (axis=1) 而非列操作 (axis=0) 上
     # 是否增强颜色细节，由 8 色添加到 24 色
@@ -147,14 +162,39 @@ def get_color_codes(data: Sequence[Sequence[int]], func: Callable = deltaE_ciede
         distances = np.asarray([func(reference_colormap, comparison_color, **func_kwargs) for comparison_color in comparison_colors])
     # 找到最小距离的索引，shape=(N, )
     min_index = np.argmin(distances, axis=1)
-    # 最佳匹配颜色，shape=(N, 3)
-    best_color = colors[min_index].reshape(-1, 3)
-    # 返回颜色映射代码
-    return [switcher.get(tuple(bc), Style.NORMAL + Fore.BLACK) for bc in best_color]
+    # 聚类颜色映射列表，shape=(N, 3)
+    cluster_color = colors[min_index].reshape(-1, 3)
+    # 返回聚类颜色映射列表
+    return cluster_color
+
+
+def pixel2cluster_color_code(
+    data: Sequence[Sequence[int]],
+    func: Callable = deltaE_ciede2000, 
+    mode: str = 'lab', 
+    func_kwargs: dict = {}, 
+    enhance_color: bool = True, 
+) -> list[str]:
+    '''
+    获取聚类颜色映射代码列表
+    ---
+    :param data: rgb list-like or ndarray, shape=(N, 3)
+    :param func: 衡量颜色差异的可调用对象，该函数接受的第一个参数为参考颜色，第二个参数为比较颜色，函数签名请阅览 skimage.color 中提供的 deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc 函数。可选。默认为 skimage.color.deltaE_ciede2000
+    :param mode: 衡量 data 颜色差异的颜色空间，必须与 func 计算所使用的颜色空间对应，可选。默认为 'lab'
+    :param func_kwargs: 要传递给 func 的关键字参数，可选。默认为空字典
+    :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色，可选。默认为 True
+    :return: 聚类颜色映射代码列表，shape=(N, )
+    '''
+    # 聚类颜色映射列表，shape=(N, 3)
+    cluster_color = pixel2cluster_color(data=data, func=func, mode=mode, func_kwargs=func_kwargs, enhance_color=enhance_color,)
+    # 聚类颜色映射代码列表，shape=(N, )
+    cluster_color_code =  [switcher.get(tuple(bc), Style.NORMAL + Fore.BLACK) for bc in cluster_color]
+    # 返回聚类颜色映射代码列表
+    return cluster_color_code
 
 
 # 转换为 ANSI 转义序列，使用 np.frompyfunc 创建 ufunc
-ufunc_pixel2color_codes = np.frompyfunc(lambda r, g, b: f'\033[38;2;{r};{g};{b}m', 3, 1)
+pixel2true_color_code: Callable[[Sequence[int], Sequence[int], Sequence[int]], Sequence[str]] = np.frompyfunc(lambda r, g, b: f'\033[38;2;{r};{g};{b}m', 3, 1)
 
 
 class COLORMODE(Enum):
