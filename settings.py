@@ -27,17 +27,20 @@ output_dir: str = './Data'
 # 同时，若该值过小，则会导致输出质量较差
 aspect: int = 256
 
+# 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一
+color_mode: Literal['CLUSTERCOLOR', 'TRUECOLOR'] = 'CLUSTERCOLOR'
+
+# 是否绘制背景，仅在 color_mode 为 CLUSTERCOLOR 时使用
+enable_background: bool = False
+
 # 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False
 enhance_detail: bool = False
 
 # 是否增强亮度细节，按照图像像素亮度排序字符集，优先使用亮度较高的字符
 enhance_lightness: bool = True
 
-# 是否增强颜色细节，由 8 色添加到 24 色。仅在 color_mode 为 CLUSTERCOLOR 时使用
+# 是否增强颜色细节，由 8 色添加到 24 色，仅在 color_mode 为 CLUSTERCOLOR 时使用
 enhance_color: bool = True
-
-# 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一
-color_mode: Literal['CLUSTERCOLOR', 'TRUECOLOR'] = 'TRUECOLOR'
 
 # 是否减小内存占用，使用游程编码，开启此选项可显著减少每个视频帧的文本文件大小，但会略微减慢视频转换的处理速度
 enhance_memory: bool = True
