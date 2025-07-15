@@ -53,6 +53,7 @@ def draw_text(
     fontFace: int = cv.FONT_HERSHEY_SIMPLEX,
     fontScale: float = 1.0,
     thickness: int = 1,
+    enable_background: bool = False,
 ) -> np.ndarray:
     """
     创建一个包含全部文本的最小外接矩形（bounding box）并绘制文本，自动处理换行符 '\\n'
@@ -63,6 +64,7 @@ def draw_text(
         fontFace (int, optional): 要使用的字体，请参阅 cv.HersheyFonts. Defaults to cv.FONT_HERSHEY_SIMPLEX.
         fontScale (float, optional): 字体比例因子乘以特定于字体的基本大小. Defaults to 1.0.
         thickness (int, optional): 用于呈现文本的线条粗细. Defaults to 1.
+        enable_background (bool, optional): 是否绘制背景，仅在 color_mode 为 CLUSTERCOLOR 时使用. Defaults to False.
 
     Returns:
         np.ndarray: 绘制后的图像
@@ -73,16 +75,25 @@ def draw_text(
     lines = text.split('\n')
     # 删除最后一个空行（此行为 symbols 使用列表推导式构造的一个特例）
     lines.pop(-1)
-    # 每行文本的宽度，包含线条粗细
+    # 每个文本的宽度，包含线条粗细
     letter_width, line_width = size[0], size[0] * len(lines[0])
-    # 每行文本的高度，包含基线和线条粗细
+    # 每个文本的高度，包含基线和线条粗细
     letter_height = line_height = size[1] + baseline + thickness // 2  #!由于 OpenCV 的 putText 函数不支持多行文本，因此无论文本中有多少行，都会将其视为一行进行绘制，因此不需要考虑文本宽度，而文本高度则始终为一行
     # 创建一个黑色图像，大小为包含整个字符的最小外接矩形
     image = np.zeros((line_height * len(lines), line_width, 3), np.uint8)
-    # 若未指定颜色，则使用默认颜色
-    if color is None:
-        # 默认颜色为白色
-        color = np.full((len(lines), len(lines[0]), 3), 255, dtype=np.uint8)
+    # 绘制背景，若文本颜色为空，则不进行背景的绘制
+    if enable_background and color is not None:
+        # 绘制背景颜色
+        for i, line in enumerate(lines):
+            for j, char in enumerate(line):
+                # 绘制背景
+                cv.rectangle(
+                    image,
+                    (letter_width * j, line_height * i),
+                    (letter_width * (j + 1), line_height * (i + 1)),
+                    color=color[i, j].tolist(),
+                    thickness=cv.FILLED,
+                )
     # 绘制图像起始点
     x, y = 0, line_height  # 从左下角开始绘制文本
     for i, line in enumerate(lines):
@@ -94,7 +105,7 @@ def draw_text(
                 (letter_width * j, y),
                 fontFace=fontFace,
                 fontScale=fontScale,
-                color=color[i, j].tolist(),
+                color=color[i, j].tolist() if color is not None else (255, 255, 255),
                 thickness=thickness,
                 lineType=cv.LINE_AA,
                 bottomLeftOrigin=False,
@@ -109,6 +120,7 @@ def video2symbol(
     output_symbol_dir: str,
     aspect: int,
     color_mode: COLORMODE | str = COLORMODE.TRUECOLOR,
+    enable_background: bool = False,
     enhance_detail: bool = False,
     enhance_lightness: bool = True,
     enhance_color: bool = False,
@@ -121,6 +133,7 @@ def video2symbol(
     :param output_symbol_dir: 输出视频帧文本的文件夹路径
     :param aspect: 预处理为文本前，将图像宽高放缩至不小于该参数
     :param color_mode: 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一，可选。默认为 CLUSTERCOLOR
+    :param enable_background: 是否绘制背景，仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 False
     :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False，可选。默认为 True
     :param enhance_lightness: 是否增强亮度细节，按照图像像素亮度排序字符集，优先使用亮度较高的字符，可选。默认为 True
     :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色。仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 True
@@ -233,7 +246,7 @@ def video2symbol(
                     # 8/24 色模式
                     elif color_mode == COLORMODE.CLUSTERCOLOR or color_mode == COLORMODE.CLUSTERCOLOR.name:
                         # 获取颜色映射代码列表
-                        rgb_color_codes = pixel2cluster_color_code(pixels, enhance_color=enhance_color)
+                        rgb_color_codes = pixel2cluster_color_code(pixels, enable_background=enable_background, enhance_color=enhance_color)
                     # 增强亮度细节
                     if enhance_lightness:
                         # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
@@ -254,7 +267,7 @@ def video2symbol(
                 # 8/24 色模式
                 elif color_mode == COLORMODE.CLUSTERCOLOR or color_mode == COLORMODE.CLUSTERCOLOR.name:
                     # 获取颜色映射代码列表
-                    rgb_color_codes = pixel2cluster_color_code(rgb.reshape(-1, 3), enhance_color=enhance_color)
+                    rgb_color_codes = pixel2cluster_color_code(rgb.reshape(-1, 3), enable_background=enable_background, enhance_color=enhance_color)
                 # 增强亮度细节
                 if enhance_lightness:
                     # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
@@ -349,6 +362,7 @@ def video2media(
     output_media_dir: str,
     aspect: int,
     color_mode: COLORMODE | str = COLORMODE.TRUECOLOR,
+    enable_background: bool = False,
     enhance_detail: bool = False,
     enhance_lightness: bool = True,
     enhance_color: bool = False,
@@ -360,6 +374,7 @@ def video2media(
     :param output_media_dir: 输出视频帧文本的文件夹路径
     :param aspect: 预处理为文本前，将图像宽高放缩至不小于该参数
     :param color_mode: 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一，可选。默认为 CLUSTERCOLOR
+    :param enable_background: 是否绘制背景，仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 False
     :param enhance_detail: 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False，可选。默认为 True
     :param enhance_lightness: 是否增强亮度细节，按照图像像素亮度排序字符集，优先使用亮度较高的字符，可选。默认为 True
     :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色。仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 True
@@ -476,13 +491,13 @@ def video2media(
                 ])
                 bgr_color = np.repeat(bgr_color, 2, axis=1)  # shape=(h, 2 * w, 3)
                 # 绘制文本图像
-                text_image = draw_text(symbols, bgr_color)
+                text_image = draw_text(symbols, bgr_color, enable_background=enable_background)
             else:
                 # 由于在 cmd 中字符的高度是宽度的两倍，这里使用两个字符进行填充
                 symbols = ''.join([''.join(random.choices(charset, k=2)) if (i + 1) % w != 0 else '\n' + ''.join(random.choices(charset, k=2)) for i in range(pixel_count)])
                 bgr_color = np.repeat(bgr_color, 2, axis=1)  # shape=(h, 2 * w, 3)
                 # 绘制文本图像
-                text_image = draw_text(symbols, bgr_color)
+                text_image = draw_text(symbols, bgr_color, enable_background=enable_background)
             # 保存图像文件
             safe_imwrite(f'{output_media_dir}/{video_name}_{current_frame:0>7d}.jpg', text_image)
             e = time.time()
