@@ -28,13 +28,13 @@ output_dir: str = './Data'
 aspect: int = 256
 
 # 颜色模式，为 CLUSTERCOLOR（聚类为 8/24 色的临近色）、TRUECOLOR（24 位真彩色）之一
-color_mode: Literal['CLUSTERCOLOR', 'TRUECOLOR'] = 'CLUSTERCOLOR'
+color_mode: Literal['CLUSTERCOLOR', 'TRUECOLOR'] = 'TRUECOLOR'
 
 # 是否绘制背景，仅在 color_mode 为 CLUSTERCOLOR 时使用
-enable_background: bool = False
+enable_background: bool = True
 
 # 是否增强图像细节，为图像边缘添加白色描边。建议在 color_mode 为 CLUSTERCOLOR 时设置为 True，color_mode 为 TRUECOLOR 时设置为 False
-enhance_detail: bool = False
+enhance_detail: bool = True
 
 # 是否增强亮度细节，按照图像像素亮度排序字符集，优先使用亮度较高的字符
 enhance_lightness: bool = True
