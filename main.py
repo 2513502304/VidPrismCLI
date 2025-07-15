@@ -2,7 +2,7 @@
 Author: 未来可欺 2513502304@qq.com
 Date: 2025-01-24 15:27:02
 LastEditors: 未来可欺 2513502304@qq.com
-LastEditTime: 2025-07-07 22:20:18
+LastEditTime: 2025-07-15 13:53:57
 Description: 命令行中打印的彩色视频
 '''
 
@@ -60,6 +60,7 @@ def main():
                 output_symbol_dir=symbol_dir,
                 aspect=settings.aspect,
                 color_mode=settings.color_mode,
+                enable_background=settings.enable_background,
                 enhance_detail=settings.enhance_detail,
                 enhance_lightness=settings.enhance_lightness,
                 enhance_color=settings.enhance_color,
@@ -81,6 +82,7 @@ def main():
                 output_media_dir=media_dir,
                 aspect=settings.aspect,
                 color_mode=settings.color_mode,
+                enable_background=settings.enable_background,
                 enhance_detail=settings.enhance_detail,
                 enhance_lightness=settings.enhance_lightness,
                 enhance_color=settings.enhance_color,
