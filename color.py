@@ -6,6 +6,7 @@ import numpy as np
 import cv2 as cv
 
 # 颜色吸管：https://photokit.com/colors/eyedropper/?lang=zh
+
 # normal color
 NORMAL_BLACK: Final = (12, 12, 12)  # #0c0c0c
 NORMAL_RED: Final = (197, 15, 31)  # #c50f1f
@@ -34,8 +35,8 @@ BRIGHT_MAGENTA: Final = (180, 0, 158)  # #b4009e
 BRIGHT_CYAN: Final = (97, 214, 214)  # #61d6d6
 BRIGHT_WHILE: Final = (242, 242, 242)  # #f2f2f2
 
-# 颜色选择器
-switcher = {
+# 前景颜色选择器
+fore_switcher = {
     # normal color
     NORMAL_BLACK: Style.NORMAL + Fore.BLACK,
     NORMAL_RED: Style.NORMAL + Fore.RED,
@@ -63,6 +64,37 @@ switcher = {
     BRIGHT_MAGENTA: Style.BRIGHT + Fore.MAGENTA,  # Fore.LIGHTMAGENTA_EX
     BRIGHT_CYAN: Style.BRIGHT + Fore.CYAN,  # Fore.LIGHTCYAN_EX
     BRIGHT_WHILE: Style.BRIGHT + Fore.WHITE,  # Fore.LIGHTYELLOW_EX
+}
+
+# 背景颜色选择器
+back_switcher = {
+    # normal color
+    NORMAL_BLACK: Style.NORMAL + Back.BLACK,
+    NORMAL_RED: Style.NORMAL + Back.RED,
+    NORMAL_GREEN: Style.NORMAL + Back.GREEN,
+    NORMAL_YELLOW: Style.NORMAL + Back.YELLOW,
+    NORMAL_BLUE: Style.NORMAL + Back.BLUE,
+    NORMAL_MAGENTA: Style.NORMAL + Back.MAGENTA,
+    NORMAL_CYAN: Style.NORMAL + Back.CYAN,
+    NORMAL_WHILE: Style.NORMAL + Back.WHITE,
+    # dim color
+    DIM_BLACK: Style.DIM + Back.BLACK,
+    DIM_RED: Style.DIM + Back.RED,
+    DIM_GREEN: Style.DIM + Back.GREEN,
+    DIM_YELLOW: Style.DIM + Back.YELLOW,
+    DIM_BLUE: Style.DIM + Back.BLUE,
+    DIM_MAGENTA: Style.DIM + Back.MAGENTA,
+    DIM_CYAN: Style.DIM + Back.CYAN,
+    DIM_WHILE: Style.DIM + Back.WHITE,
+    # bright color
+    BRIGHT_BLACK: Style.BRIGHT + Back.BLACK,  # Back.LIGHTBLACK_EX
+    BRIGHT_RED: Style.BRIGHT + Back.RED,  # Back.LIGHTRED_EX
+    BRIGHT_GREEN: Style.BRIGHT + Back.GREEN,  # Back.LIGHTGREEN_EX
+    BRIGHT_YELLOW: Style.BRIGHT + Back.YELLOW,  # Back.LIGHTWHITE_EX
+    BRIGHT_BLUE: Style.BRIGHT + Back.BLUE,  #  Back.LIGHTBLUE_EX
+    BRIGHT_MAGENTA: Style.BRIGHT + Back.MAGENTA,  # Back.LIGHTMAGENTA_EX
+    BRIGHT_CYAN: Style.BRIGHT + Back.CYAN,  # Back.LIGHTCYAN_EX
+    BRIGHT_WHILE: Style.BRIGHT + Back.WHITE,  # Back.LIGHTYELLOW_EX
 }
 
 
@@ -128,9 +160,9 @@ def pixel2cluster_color(
     #! 使用矢量化操作提高性能，并配合 numpy 默认行存储的特性对其内存布局进行计算优化，以保证所有的计算都发生在行操作 (axis=1) 而非列操作 (axis=0) 上
     # 是否增强颜色细节，由 8 色添加到 24 色
     if enhance_color:
-        colormap = list(switcher.keys())
+        colormap = list(fore_switcher.keys())   # list(back_switcher.keys())
     else:
-        colormap = list(switcher.keys())[:8]
+        colormap = list(fore_switcher.keys())[:8]   # list(back_switcher.keys())[:8]
     # 输入的 rgb 颜色，shape=(N, 1, 3)
     rgbs = np.asarray(data, dtype=np.uint8).reshape(-1, 1, 3)
     # rgb 颜色列表，shape=(M, 1, 3)
@@ -173,6 +205,7 @@ def pixel2cluster_color_code(
     func: Callable = deltaE_ciede2000, 
     mode: str = 'lab', 
     func_kwargs: dict = {}, 
+    enable_background: bool = False,
     enhance_color: bool = True, 
 ) -> list[str]:
     '''
@@ -182,13 +215,19 @@ def pixel2cluster_color_code(
     :param func: 衡量颜色差异的可调用对象，该函数接受的第一个参数为参考颜色，第二个参数为比较颜色，函数签名请阅览 skimage.color 中提供的 deltaE_cie76, deltaE_ciede2000, deltaE_ciede94, deltaE_cmc 函数。可选。默认为 skimage.color.deltaE_ciede2000
     :param mode: 衡量 data 颜色差异的颜色空间，必须与 func 计算所使用的颜色空间对应，可选。默认为 'lab'
     :param func_kwargs: 要传递给 func 的关键字参数，可选。默认为空字典
+    :param enable_background: 是否绘制背景，仅在 color_mode 为 CLUSTERCOLOR 时使用，可选。默认为 False
     :param enhance_color: 是否增强颜色细节，由 8 色添加到 24 色，可选。默认为 True
     :return: 聚类颜色映射代码列表，shape=(N, )
     '''
     # 聚类颜色映射列表，shape=(N, 3)
-    cluster_color = pixel2cluster_color(data=data, func=func, mode=mode, func_kwargs=func_kwargs, enhance_color=enhance_color,)
+    cluster_color = pixel2cluster_color(data=data, func=func, mode=mode, func_kwargs=func_kwargs, enhance_color=enhance_color, )
     # 聚类颜色映射代码列表，shape=(N, )
-    cluster_color_code =  [switcher.get(tuple(bc), Style.NORMAL + Fore.BLACK) for bc in cluster_color]
+    if enable_background:
+        # 若启用背景，则使用背景颜色
+        cluster_color_code = [back_switcher.get(tuple(bc), Style.NORMAL + Back.BLACK) for bc in cluster_color]
+    else:
+        # 否则使用前景颜色
+        cluster_color_code =  [fore_switcher.get(tuple(bc), Style.NORMAL + Fore.BLACK) for bc in cluster_color]
     # 返回聚类颜色映射代码列表
     return cluster_color_code
 
