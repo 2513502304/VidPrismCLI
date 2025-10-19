@@ -22,20 +22,21 @@ def split_va(
         f'ffmpeg -i "{input_file_path}" -vn -c:a copy "{output_audio_path}"',
     ]
     for cmd in cmds:
-        command = subprocess.run(
+        process = subprocess.run(
             cmd,
             shell=True,
             capture_output=True,
             check=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=600,
         )
-        args = command.args
-        returncode = command.returncode
-        stdout = command.stdout.decode('utf-8')
-        stderr = command.stderr.decode('utf-8')
-        logger.info(f'{args = }')
-        logger.info(f'{returncode = }')
-        logger.info(f'{stdout}')
-        logger.info(f'{stderr}')
+        logger.info(f'{process.args = }')
+        if process.stdout:
+            logger.info(f'{process.stdout}')
+        if process.stderr:
+            logger.info(f'{process.stderr}')
 
 
 def merge_va(
@@ -56,17 +57,19 @@ def merge_va(
         f'ffmpeg -i "{input_video_path}" -i "{input_audio_path}" -c:v copy -c:a copy "{output_file_path}"',
     ]
     for cmd in cmds:
-        command = subprocess.run(
+        process = subprocess.run(
             cmd,
             shell=True,
             capture_output=True,
             check=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=600,
         )
-        args = command.args
-        returncode = command.returncode
-        stdout = command.stdout.decode('utf-8')
-        stderr = command.stderr.decode('utf-8')
-        logger.info(f'{args = }')
-        logger.info(f'{returncode = }')
-        logger.info(f'{stdout}')
-        logger.info(f'{stderr}')
+        logger.info(f'{process.args = }')
+        if process.stdout:
+            logger.info(f'{process.stdout}')
+        if process.stderr:
+            logger.info(f'{process.stderr}')
+
