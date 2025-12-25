@@ -12,13 +12,23 @@ console = Console()
 
 # 日志记录
 logging.basicConfig(
-    format='%(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    level=logging.DEBUG,
-    handlers=[RichHandler(console=console, )],
+    format="%(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.WARNING,
+    handlers=[
+        RichHandler(
+            console=console,
+            level=logging.NOTSET,
+            rich_tracebacks=True,
+            tracebacks_show_locals=True,
+            tracebacks_suppress=[],
+            tracebacks_max_frames=100,
+        )
+    ],
+    force=False,
 )
 logger = logging.getLogger('VidPrismCLI')
-
+logger.setLevel(logging.INFO)
 
 def safe_imread(file: str) -> np.ndarray:
     """
